@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block header %}Dashboard{% endblock %}
+
+{% block header_actions %}
+<div class="btn-group">
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickAddModal">
+        <i class="bi bi-magic"></i> Quick Add
+    </button>
+    <a href="{% url 'task_create' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> New Task
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Stats Cards -->
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">Total Tasks</h5>
+                <h2 class="card-text">{{ total_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Completed</h5>
+                <h2 class="card-text">{{ completed_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">Pending</h5>
+                <h2 class="card-text">{{ pending_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title">Overdue</h5>
+                <h2 class="card-text">{{ overdue_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Task List -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Tasks</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                    <div class="list-group">
+                        {% for task in recent_tasks %}
+                            <div class="list-group-item task-card task-priority-{{ task.priority|lower }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ task.title }}</h6>
+                                        <small class="text-muted">
+                                            <i class="bi bi-tag"></i> {{ task.category.name|default:"No category" }}
+                                            | <i class="bi bi-calendar"></i> 
+                                            {% if task.due_date %}
+                                                Due: {{ task.due_date|date:"M d, Y" }}
+                                            {% else %}
+                                                No due date
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-{% if task.priority == 'URGENT' %}danger{% elif task.priority == 'HIGH' %}warning{% elif task.priority == 'MEDIUM' %}info{% else %}secondary{% endif %}">
+                                            {{ task.get_priority_display }}
+                                        </span>
+                                        <span class="badge bg-{% if task.status == 'DONE' %}success{% elif task.status == 'IN_PROGRESS' %}primary{% else %}secondary{% endif %}">
+                                            {{ task.get_status_display }}
+                                        </span>
+                                        {% if task.ai_priority_score %}
+                                            <span class="badge ai-badge">AI</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No tasks yet. Create your first task!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Recommendations -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-gradient ai-badge">
+                <h5 class="text-white mb-0">
+                    <i class="bi bi-robot"></i> AI Recommendations
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <p class="mb-0">{{ recommendations|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Productivity Chart -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Weekly Progress</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="productivityChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Modal -->
+<div class="modal fade" id="quickAddModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Add Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickAddForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Describe your task naturally:</label>
+                        <textarea class="form-control" id="quickTaskInput" rows="3" 
+                                  placeholder="E.g., 'Schedule meeting with team tomorrow at 2pm high priority'"></textarea>
+                        <small class="text-muted">AI will parse your natural language and create the task.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="quickAddBtn">
+                    <span id="quickAddSpinner" class="spinner-border spinner-border-sm d-none"></span>
+                    Add Task
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Chart.js implementation
+    const ctx = document.getElementById('productivityChart').getContext('2d');
+    const productivityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_data.dates|safe }},
+            datasets: [{
+                label: 'Tasks Completed',
+                data: {{ chart_data.completed|safe }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+    
+    // Quick add functionality
+    document.getElementById('quickAddBtn').addEventListener('click', function() {
+        const input = document.getElementById('quickTaskInput');
+        const spinner = document.getElementById('quickAddSpinner');
+        
+        if (!input.value.trim()) {
+            alert('Please enter a task description');
+            return;
+        }
+        
+        // Show loading spinner
+        spinner.classList.remove('d-none');
+        this.disabled = true;
+        
+        // Send AJAX request
+        fetch('{% url "quick_add" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: new URLSearchParams({
+                'text': input.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal and reload page
+                bootstrap.Modal.getInstance(document.getElementById('quickAddModal')).hide();
+                location.reload();
+            } else {
+                alert('Error adding task: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error adding task');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            spinner.classList.add('d-none');
+            this.disabled = false;
+        });
+    });
+</script>
+{% endblock %}

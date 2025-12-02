@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block header %}
+    {% if task %}Edit Task{% else %}Create New Task{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>{% if task %}Edit Task{% else %}Create New Task{% endif %}</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="taskForm">
+                    {% csrf_token %}
+                    
+                    <!-- Natural Language Toggle -->
+                    <div class="mb-3 form-check form-switch">
+                        {{ form.use_natural_language }}
+                        <label class="form-check-label" for="{{ form.use_natural_language.id_for_label }}">
+                            Use AI Natural Language Processing
+                        </label>
+                        <small class="text-muted d-block">
+                            Describe your task naturally and let AI parse it into structured data
+                        </small>
+                    </div>
+                    
+                    <!-- Natural Language Input (hidden by default) -->
+                    <div id="naturalLanguageSection" class="mb-3 d-none">
+                        {{ form.natural_language_input.label_tag }}
+                        {{ form.natural_language_input }}
+                        <small class="text-muted">
+                            Examples: "Call John tomorrow at 3pm high priority" or "Finish report by Friday"
+                        </small>
+                    </div>
+                    
+                    <!-- Regular Form Fields -->
+                    <div id="regularFormFields">
+                        <div class="mb-3">
+                            {{ form.title.label_tag }}
+                            {{ form.title }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.description.label_tag }}
+                            {{ form.description }}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.category.label_tag }}
+                                {{ form.category }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.priority.label_tag }}
+                                {{ form.priority }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.status.label_tag }}
+                                {{ form.status }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.due_date.label_tag }}
+                                {{ form.due_date }}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.estimated_duration.label_tag }}
+                            <div class="input-group">
+                                {{ form.estimated_duration }}
+                                <span class="input-group-text">minutes</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'task_list' %}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if task %}Update{% else %}Create{% endif %} Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    // Toggle between natural language and regular form
+    const naturalLanguageToggle = document.getElementById('{{ form.use_natural_language.id_for_label }}');
+    const naturalLanguageSection = document.getElementById('naturalLanguageSection');
+    const regularFormFields = document.getElementById('regularFormFields');
+    
+    function toggleFormFields() {
+        if (naturalLanguageToggle.checked) {
+            naturalLanguageSection.classList.remove('d-none');
+            regularFormFields.classList.add('d-none');
+        } else {
+            naturalLanguageSection.classList.add('d-none');
+            regularFormFields.classList.remove('d-none');
+        }
+    }
+    
+    naturalLanguageToggle.addEventListener('change', toggleFormFields);
+    toggleFormFields(); // Initial call
+</script>
+{% endblock %}
+
+{% endblock %}
